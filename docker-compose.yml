@@ -1,0 +1,144 @@
+# ============================================================
+#  Splittr — Development Compose
+#
+#  Services:
+#    nginx (LB)  → 3× backend → postgres
+#                            → redis
+#    frontend (Vite HMR)
+#
+#  Usage:
+#    docker-compose up --build
+#    docker-compose up --scale backend=5   ← add more replicas
+# ============================================================
+
+version: '3.9'
+
+x-backend-base: &backend-base
+  build:
+    context: ./backend
+    target: development
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://postgres:password@db:5432/splittr
+    REDIS_URL: redis://redis:6379
+    NODE_ENV: development
+    CORS_ORIGIN: http://localhost:5173
+  volumes:
+    - ./backend:/app
+    - /app/node_modules
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: splittr_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: splittr
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  # ── Redis ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: splittr_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - internal
+
+  # ── Backend instances (scale with --scale backend=N) ────
+  backend_1:
+    <<: *backend-base
+    container_name: splittr_backend_1
+    command: >
+      sh -c "npx prisma migrate deploy &&
+             npx prisma db seed &&
+             npm run dev"
+    networks:
+      - internal
+
+  backend_2:
+    <<: *backend-base
+    container_name: splittr_backend_2
+    command: npm run dev
+    networks:
+      - internal
+
+  backend_3:
+    <<: *backend-base
+    container_name: splittr_backend_3
+    command: npm run dev
+    networks:
+      - internal
+
+  # ── Frontend ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: splittr_frontend
+    ports:
+      - '5173:5173'
+    environment:
+      VITE_API_URL: http://localhost/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    networks:
+      - internal
+
+  # ── Nginx Load Balancer ──────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      target: development
+    container_name: splittr_nginx
+    ports:
+      - '80:80'
+    depends_on:
+      - backend_1
+      - backend_2
+      - backend_3
+      - frontend
+    restart: unless-stopped
+    networks:
+      - internal
+      - external
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  internal:
+    driver: bridge
+  external:
+    driver: bridge

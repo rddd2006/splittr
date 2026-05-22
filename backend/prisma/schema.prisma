@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  passwordHash  String
+  avatar        String?
+  walletAddress String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  memberships         GroupMember[]
+  paidExpenses        Expense[]       @relation("PaidBy")
+  expenseSplits       ExpenseSplit[]
+  sentSettlements     Settlement[]    @relation("SentSettlements")
+  receivedSettlements Settlement[]    @relation("ReceivedSettlements")
+  refreshTokens       RefreshToken[]
+  web3Nonces          Web3Nonce[]
+
+  @@map("users")
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  currency    String   @default("INR")
+  joinCode    String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     GroupMember[]
+  expenses    Expense[]
+  settlements Settlement[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  role     Role     @default(MEMBER)
+  joinedAt DateTime @default(now())
+  userId   String
+  groupId  String
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@map("group_members")
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  amount      Decimal   @db.Decimal(10, 2)
+  currency    String    @default("INR")
+  splitType   SplitType @default(EQUAL)
+  date        DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  paidById    String
+  groupId     String
+
+  paidBy Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  payer  User         @relation("PaidBy", fields: [paidById], references: [id])
+  splits ExpenseSplit[]
+
+  @@map("expenses")
+}
+
+model ExpenseSplit {
+  id         String   @id @default(cuid())
+  amount     Decimal  @db.Decimal(10, 2)
+  percentage Decimal? @db.Decimal(5, 2)
+  settled    Boolean  @default(false)
+  expenseId  String
+  userId     String
+
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([expenseId, userId])
+  @@map("expense_splits")
+}
+
+model Settlement {
+  id         String   @id @default(cuid())
+  amount     Decimal  @db.Decimal(10, 2)
+  note       String?
+  txHash     String?
+  method     String   @default("manual")
+  createdAt  DateTime @default(now())
+  fromUserId String
+  toUserId   String
+  groupId    String
+
+  from  User  @relation("SentSettlements",     fields: [fromUserId], references: [id])
+  to    User  @relation("ReceivedSettlements",  fields: [toUserId],   references: [id])
+  group Group @relation(fields: [groupId], references: [id])
+
+  @@map("settlements")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Web3Nonce {
+  id        String   @id @default(cuid())
+  address   String   @unique
+  nonce     String
+  expiresAt DateTime
+  userId    String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("web3_nonces")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum SplitType {
+  EQUAL
+  PERCENTAGE
+  EXACT
+}

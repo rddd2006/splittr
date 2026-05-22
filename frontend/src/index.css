@@ -1,0 +1,219 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Cassette Futurism Palette */
+  --crt-green: #33FF00;
+  --phosphor-amber: #FFB000;
+  --charcoal: #333333;
+  --deep-navy: #1B2838;
+  --tape-red: #CC0000;
+  --static-grey: #999999;
+  --off-white: #E8E0D0;
+  
+  /* Legacy aliases (maintain compatibility) */
+  --bg: #1B2838;
+  --surface: rgba(255,255,255,0.04);
+  --border: rgba(255,176,0,0.15);
+  --green: #33FF00;
+  --green-dim: rgba(51,255,0,0.12);
+  --green-glow: rgba(51,255,0,0.3);
+  --red: #CC0000;
+  --text: #E8E0D0;
+  --sub: rgba(232,224,208,0.6);
+  --dim: rgba(232,224,208,0.3);
+}
+
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.97; }
+}
+
+@keyframes scanline-drift {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(10px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(51,255,0,0.3); }
+  50% { box-shadow: 0 0 25px rgba(51,255,0,0.5); }
+}
+
+@keyframes tape-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; }
+  body {
+    background: linear-gradient(135deg, #0F1519 0%, #1B2838 100%);
+    color: var(--crt-green);
+    font-family: 'VT323', 'JetBrains Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+    position: relative;
+  }
+  
+  /* CRT Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+    animation: scanline-drift 20s linear infinite;
+  }
+  
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--deep-navy); }
+  ::-webkit-scrollbar-thumb { 
+    background: var(--phosphor-amber);
+    border: 2px solid var(--deep-navy);
+    border-radius: 2px;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'VT323', monospace;
+    font-weight: 700;
+    color: var(--crt-green);
+    text-shadow: 0 0 5px rgba(51,255,0,0.5);
+  }
+}
+
+@layer components {
+  .glass {
+    background: rgba(27, 40, 56, 0.6);
+    border: 2px solid var(--phosphor-amber);
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 15px rgba(51,255,0,0.1), inset 0 0 20px rgba(255,176,0,0.05);
+  }
+  
+  .glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.1) 2px,
+      rgba(0,0,0,0.1) 4px
+    );
+    pointer-events: none;
+    border-radius: 2px;
+  }
+  
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 font-bold text-sm cursor-pointer transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+    font-family: 'VT323', monospace;
+    border-radius: 2px;
+    border: 3px solid var(--phosphor-amber);
+    letter-spacing: 0.05em;
+  }
+  
+  .btn-primary {
+    @apply btn;
+    background: var(--crt-green);
+    color: var(--deep-navy);
+    box-shadow: 0 0 15px rgba(51,255,0,0.4);
+    text-shadow: none;
+    font-weight: 700;
+  }
+  
+  .btn-primary:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(51,255,0,0.6), inset 0 0 10px rgba(51,255,0,0.2);
+    filter: brightness(1.15);
+  }
+  
+  .btn-primary:active:not(:disabled) {
+    transform: scale(0.98);
+    box-shadow: 0 0 15px rgba(51,255,0,0.3), inset 0 0 15px rgba(51,255,0,0.3);
+  }
+  
+  .btn-ghost {
+    @apply btn;
+    background: transparent;
+    border: 2px solid var(--crt-green);
+    color: var(--crt-green);
+    box-shadow: 0 0 10px rgba(51,255,0,0.2);
+    text-shadow: 0 0 3px rgba(51,255,0,0.4);
+  }
+  
+  .btn-ghost:hover:not(:disabled) {
+    background: rgba(51,255,0,0.08);
+    box-shadow: 0 0 20px rgba(51,255,0,0.4);
+  }
+  
+  .btn-muted {
+    @apply btn;
+    background: rgba(232,224,208,0.05);
+    border: 2px solid var(--static-grey);
+    color: var(--off-white);
+  }
+  
+  .card {
+    @apply glass rounded-none relative;
+  }
+  
+  .input {
+    @apply w-full px-3.5 py-2.5 text-sm outline-none transition-all;
+    background: rgba(27,40,56,0.4);
+    border: 2px solid var(--phosphor-amber);
+    color: var(--crt-green);
+    font-family: 'VT323', monospace;
+    border-radius: 2px;
+    text-shadow: 0 0 3px rgba(51,255,0,0.3);
+  }
+  
+  .input:focus {
+    border-color: var(--crt-green);
+    box-shadow: 0 0 15px rgba(51,255,0,0.4), inset 0 0 10px rgba(51,255,0,0.1);
+  }
+  
+  .input::placeholder { color: var(--dim); }
+  
+  .label {
+    @apply block text-xs font-semibold mb-2;
+    color: var(--phosphor-amber);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-shadow: 0 0 3px rgba(255,176,0,0.3);
+  }
+
+
+  /* Stat chip */
+  .chip-green { background: var(--green-dim); border: 1px solid rgba(0,224,122,0.3); color: var(--green); }
+  .chip-red   { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.3); color: #f87171; }
+
+  /* Sidebar nav link */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150;
+    color: var(--sub);
+  }
+  .nav-link:hover  { background: rgba(255,255,255,0.05); color: var(--text); }
+  .nav-link.active { background: var(--green-dim); border: 1px solid rgba(0,224,122,0.25); color: var(--green); }
+}
+
+@keyframes spin   { to { transform: rotate(360deg); } }
+@keyframes pulse  { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+@keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+
+.animate-fade-up { animation: fadeUp 0.4s ease both; }
+.animate-spin    { animation: spin 0.8s linear infinite; }

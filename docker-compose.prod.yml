@@ -1,0 +1,140 @@
+# ============================================================
+#  Splittr — Production Compose
+#
+#  Scales backend to 3 replicas behind the Nginx LB.
+#  Redis for rate-limit state. Postgres with named volume.
+#
+#  Usage:
+#    docker-compose -f docker-compose.prod.yml up -d --scale backend=5
+# ============================================================
+
+version: '3.9'
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: splittr
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # ── Redis ───────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redisdata_prod:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 600M
+
+  # ── Backend (3 named replicas for Nginx upstream) ───────
+  backend_1: &backend-prod
+    build:
+      context: ./backend
+      target: production
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/splittr
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      NODE_ENV: production
+      CORS_ORIGIN: https://${SERVER_NAME}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma migrate deploy && node src/index.js"
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://localhost:4000/api/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend_2:
+    <<: *backend-prod
+    command: node src/index.js   # migrations already ran in backend_1
+
+  backend_3:
+    <<: *backend-prod
+    command: node src/index.js
+
+  # ── Nginx Load Balancer ──────────────────────────────────
+  nginx:
+    build:
+      context: ./nginx
+      target: production
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - /etc/letsencrypt/live/${SERVER_NAME}/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+      - /etc/letsencrypt/live/${SERVER_NAME}/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
+      - nginx_cache:/var/cache/nginx
+    environment:
+      SERVER_NAME: ${SERVER_NAME}
+    depends_on:
+      - backend_1
+      - backend_2
+      - backend_3
+    networks:
+      - internal
+      - external
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+
+volumes:
+  pgdata_prod:
+  redisdata_prod:
+  nginx_cache:
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  external:
+    driver: bridge
