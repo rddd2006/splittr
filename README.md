@@ -1,8 +1,8 @@
-# 💸 SettleUp — Web3 Expense Splitting App
+# 💸 splittr — Web3 Expense Splitting App
 
 > Split bills. Settle debts. Pay with GPay or Ethereum. No drama.
 
-SettleUp is a full-stack expense management app with **AI bill scanning**, **Ethereum Sepolia payments**, **MetaMask login**, and **group invite codes** — built with React, Node.js, PostgreSQL, Redis, and Nginx load balancing.
+splittr  is a full-stack expense management app with **AI bill scanning**, **Ethereum Sepolia payments**, **MetaMask login**, and **group invite codes** — built with React, Node.js, PostgreSQL, Redis, and Nginx load balancing.
 
 ---
 
